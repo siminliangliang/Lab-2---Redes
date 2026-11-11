@@ -87,10 +87,9 @@ def install_entries(thrift_port, cli_bin):
 
 
 def parse_counter_value(body):
-    p = re.search(r"packets=(\d+)", body)
-    b = re.search(r"bytes=(\d+)", body)
+    p = re.search(r"packets=(\d+)", body) or re.search(r"(\d+)\s*packets", body)
+    b = re.search(r"bytes=(\d+)", body) or re.search(r"(\d+)\s*bytes", body)
     return (int(p.group(1)) if p else 0, int(b.group(1)) if b else 0)
-
 
 def read_stats(flow_handles, thrift_port, cli_bin):
     """Lee contadores y registers. Devuelve (flujos, protos, bytes_reg, max_len)."""
@@ -107,7 +106,7 @@ def read_stats(flow_handles, thrift_port, cli_bin):
 
     flow_by_handle = {}
     proto_cnt = {}
-    for name, idx, body in re.findall(r"(\S+)\[(\d+)\]=\s*BmCounterValue\(([^)]*)\)", out):
+    for name, idx, body in re.findall(r"(\S+)\[(\d+)\]=\s*(.*(?:bytes|packets).*)", out):
         value = parse_counter_value(body)
         if name.endswith("flow_counter"):
             flow_by_handle[int(idx)] = value

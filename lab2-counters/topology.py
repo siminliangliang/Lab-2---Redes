@@ -64,9 +64,11 @@ class P4Switch(Switch):
         for port, intf in self.intfs.items():
             if not intf.IP():
                 args.extend(["-i", "%d@%s" % (port, intf.name)])
+                self.cmd("sysctl -w net.ipv6.conf.%s.disable_ipv6=1" % intf.name)
         args.extend(["--thrift-port", str(self.thrift_port)])
         args.append("--log-console")  # util para depurar: ver el log en self.log_file
-        args.append(self.json_path)
+        args.append(self.json_path)        
+
         self.cmd(" ".join(args) + " > " + self.log_file + " 2>&1 &")
         if not wait_for_port(self.thrift_port):
             raise RuntimeError("%s no levanto. Revisa %s" % (self.sw_path, self.log_file))
@@ -87,7 +89,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--json", default="build/counters.json", help="programa P4 compilado (default: build/counters.json)")
     parser.add_argument("--bmv2", default="simple_switch", help="binario de BMv2 (default: simple_switch)")
+    parser.add_argument("--quiet", action="store_true",
+                        help="modo prueba exacta: los hosts no responden (UDP, proto 253, ping)")
     args = parser.parse_args()
+
 
     if os.geteuid() != 0:
         sys.exit("Ejecuta con sudo: sudo python3 topology.py")
@@ -116,6 +121,11 @@ def main():
         h.cmd("sysctl -w net.ipv6.conf.all.disable_ipv6=1")
         h.cmd("sysctl -w net.ipv6.conf.default.disable_ipv6=1")
         h.cmd("sysctl -w net.ipv6.conf.lo.disable_ipv6=1")
+        if args.quiet:
+            h.cmd("iptables -A INPUT -p udp -j DROP")
+            h.cmd("iptables -A INPUT -p 253 -j DROP")
+            h.cmd("sysctl -w net.ipv4.icmp_echo_ignore_all=1")
+
 
     info("\nTopologia lista. En otra terminal ejecuta: python3 controller.py\n")
     info("Ejemplos en esta consola:  h1 ping -c 3 h2   |   h1 python3 send_traffic.py --help\n\n")
