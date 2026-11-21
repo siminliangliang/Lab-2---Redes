@@ -1,0 +1,8 @@
+# r1: puerto 1 -> h1, puerto 2 -> r2
+# Formato: table_add <tabla> <accion> <prefijo> => <srcMac> <dstMac> <puerto>
+# Red local de h1
+table_add MyIngress.ipv4_lpm MyIngress.ipv4_forward 10.0.1.0/24 => 00:00:00:01:01:00 00:00:00:00:01:01 1
+# Todo lo demás va hacia r2
+table_add MyIngress.ipv4_lpm MyIngress.ipv4_forward 10.0.2.0/24 => 00:00:00:01:02:00 00:00:00:02:02:00 2
+table_add MyIngress.ipv4_lpm MyIngress.ipv4_forward 10.0.3.0/24 => 00:00:00:01:02:00 00:00:00:02:02:00 2
+table_add MyIngress.ipv4_lpm MyIngress.ipv4_forward 10.0.4.0/24 => 00:00:00:01:02:00 00:00:00:02:02:00 2

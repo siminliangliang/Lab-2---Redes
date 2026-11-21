@@ -1,0 +1,8 @@
+# r2: puerto 1 -> h2, puerto 2 -> r1, puerto 3 -> r3
+# Hacia r1
+table_add MyIngress.ipv4_lpm MyIngress.ipv4_forward 10.0.1.0/24 => 00:00:00:02:02:00 00:00:00:01:02:00 2
+# Red local de h2
+table_add MyIngress.ipv4_lpm MyIngress.ipv4_forward 10.0.2.0/24 => 00:00:00:02:01:00 00:00:00:00:02:02 1
+# Hacia r3 para h3 y h4
+table_add MyIngress.ipv4_lpm MyIngress.ipv4_forward 10.0.3.0/24 => 00:00:00:02:03:00 00:00:00:03:03:00 3
+table_add MyIngress.ipv4_lpm MyIngress.ipv4_forward 10.0.4.0/24 => 00:00:00:02:03:00 00:00:00:03:03:00 3
