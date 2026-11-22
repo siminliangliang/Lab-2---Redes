@@ -29,7 +29,7 @@ HOSTS = {
     "h4": {"ip": "10.0.4.4", "gw": "10.0.4.254", "router": "r3", "port": 2},
 }
 
-# Enlaces entre router: (router A, puerto A, router B, puerto B)
+# Enlaces entre routers: de router A en puerto X a router B en puerto X
 ROUTER_LINKS = [ ("r1", 2, "r2", 2),
                 ("r2", 3, "r3", 3), ]
 
@@ -103,12 +103,12 @@ def load_routes(router, thrift_port):
     info("Rutas cargadas en %s\n" % router)
 
 
-
-def main():
+# Construye y arranca la red completa y devuelve objeto Mininet
+def build_network():
     if os.geteuid() != 0:
-        sys.exit("Uso: sudo python3 topology.py")
+        sys.exit("Uso: sudo python3 topology.py.")
     if not os.path.exists(P4_JSON):
-        sys.exit("No existe %s. Compilar router.p4." % P4_JSON)
+        sys.exit("No existe %s. Compila router.p4." % P4_JSON)
     os.makedirs(LOG_DIR, exist_ok=True)
 
     net = Mininet(controller=None)   # sin controlador OpenFlow
@@ -128,7 +128,7 @@ def main():
     for a, pa, b, pb in ROUTER_LINKS:
         net.addLink(a, b, port1=pa, port2=pb)
 
-    net.start()  # Mininet arranca los procesos para cada router
+    net.start()
 
     # Configuracion de los hosts
     for h, cfg in HOSTS.items():
@@ -142,10 +142,15 @@ def main():
         # Host recibe la MAC de su gateway
         host.setARP(cfg["gw"], router_mac(cfg["router"], cfg["port"]))
 
-    # Cargar las rutas en cada router
+    # Cargar las rutas en cada router desde control plane
     for r in ROUTERS:
         load_routes(r, 9090 + int(r[1:]))
 
+    return net
+
+def main():
+
+    net = build_network()
     info("\n Red lista. Prueba con: pingall\n")
     CLI(net)
     net.stop()  # cerrar todo
