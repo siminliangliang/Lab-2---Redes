@@ -5,3 +5,8 @@ table_add MyIngress.ipv4_lpm MyIngress.ipv4_forward 10.0.2.0/24 => 00:00:00:03:0
 # Redes locales de h3 y h4
 table_add MyIngress.ipv4_lpm MyIngress.ipv4_forward 10.0.3.0/24 => 00:00:00:03:01:00 00:00:00:00:03:03 1
 table_add MyIngress.ipv4_lpm MyIngress.ipv4_forward 10.0.4.0/24 => 00:00:00:03:02:00 00:00:00:00:04:04 2
+
+# ICMP: MAC e IP del router en cada puerto de ENTRADA
+table_add MyIngress.icmp_ttl_exceeded MyIngress.send_icmp_time_exceeded 1 => 00:00:00:03:01:00 10.0.3.254
+table_add MyIngress.icmp_ttl_exceeded MyIngress.send_icmp_time_exceeded 2 => 00:00:00:03:02:00 10.0.4.254
+table_add MyIngress.icmp_ttl_exceeded MyIngress.send_icmp_time_exceeded 3 => 00:00:00:03:03:00 10.0.23.2
