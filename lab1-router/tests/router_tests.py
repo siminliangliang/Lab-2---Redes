@@ -2,12 +2,13 @@
 """
 Pruebas del Lab 1 Router IPv4 en P4
 
-Levanta la red de topology.py y ejecuta 4 pruebas:
+Levanta la red de topology.py y ejecuta 5 pruebas:
   1. Conectividad con ping entre los 4 hosts.
   2. TTL y MAC, envío de un paquete TTL=64 con Scapy y se captura en el destino 
                 para verificar TTL decrementado, MACs reescritas y checksum.
   3. TTL agotado, con un paquete TTL=1 llega al primer router pero no sale.
   4. Sin ruta, con un paquete a 10.0.9.9 llega al router pero no sale.
+  5. ICMP Time Exceeded: el router que agota el TTL responde al origen con un ICMP tipo 11.
 
 Uso desde cualquier carpeta:
     sudo <python del entorno P4> tests/router_tests.py | tee tests/results.txt
@@ -29,11 +30,11 @@ UDP_PORT = 5555    # puerto UDP de los paquetes de prueba
 SNIFF_TIMEOUT = 5  # segundos de espera entre cada captura
 
 
-# ROL 1 y 2: código que se ejecuta dentro de los hosts con Scapy
+# Rol sniff y send se ejecuta dentro de los hosts con Scapy
 def role_sniff(iface, bpf, out, timeout):
     """Captura 1 paquete en 'iface' y escribe resumen en archivo out.
     """
-    from scapy.all import IP, Ether, sniff
+    from scapy.all import ICMP, IP, Ether, IPerror, sniff
     pkts = sniff(iface=iface, filter=bpf, count=1, timeout=int(timeout))
     if not pkts:
         line = "NONE"
@@ -44,8 +45,20 @@ def role_sniff(iface, bpf, out, timeout):
         recalc = IP(bytes(ip))
         del recalc.chksum   # Scapy lo recalcula al serializar
         ok = IP(bytes(recalc)).chksum == shown  # verifica si checksum recibido es valido
-        line = "ttl=%d smac=%s dmac=%s chk=%s" % (
-            ip.ttl, p[Ether].src, p[Ether].dst, "OK" if ok else "BAD")
+        if p.haslayer(ICMP) and p[ICMP].type == 11:
+            # Valida el checksum del ICMP
+            ic = p[ICMP]
+            ishown = ic.chksum
+            irecalc = ICMP(bytes(ic))
+            del irecalc.chksum
+            iok = ICMP(bytes(irecalc)).chksum == ishown
+            orig = p[IPerror].dst if p.haslayer(IPerror) else "?"
+            line = "icmp=%d/%d from=%s orig_dst=%s ttl=%d chk=%s ichk=%s" % (
+                ic.type, ic.code, ip.src, orig, ip.ttl,
+                "OK" if ok else "BAD", "OK" if iok else "BAD")
+        else:
+            line = "ttl=%d smac=%s dmac=%s chk=%s" % (
+                ip.ttl, p[Ether].src, p[Ether].dst, "OK" if ok else "BAD")
     with open(out + ".tmp", "w") as f:          # escritura atómica
         f.write(line)
     os.rename(out + ".tmp", out)
@@ -61,11 +74,12 @@ def role_send(iface, smac, dmac, sip, dip, ttl):
 
 
 # ROL 3: ejecucion de pruebas
-def start_sniffer(node, tag, iface, dst_ip):
+def start_sniffer(node, tag, iface, dst_ip, bpf=None):
     """Lanza una captura dentro de node y devuelve el archivo."""
     out = "/tmp/p4lab_%s.txt" % tag
     node.cmd("rm -f %s" % out)
-    bpf = "udp and dst port %d and dst host %s" % (UDP_PORT, dst_ip)
+    if bpf is None:   # paquete UDP de prueba
+        bpf = "udp and dst port %d and dst host %s" % (UDP_PORT, dst_ip)
     node.cmd('%s %s --sniff %s "%s" %s %d > /dev/null 2>&1 &'
              % (PY, SELF, iface, bpf, out, SNIFF_TIMEOUT))
     return out
@@ -79,16 +93,16 @@ def read_result(out):
         time.sleep(0.3)
     return "ERROR (sin respuesta del sniffer)"
 
-# Envía un paquete desde origen hacia destino con ttl y captura en sniffers
-def probe(net, src, dst_ip, ttl, sniffers):
+# Envía un paquete desde origen hacia destino con ttl y lo captura en sniffer
+def probe(net, src, dst_ip, ttl, sniffers, bpf=None):
     from topology import HOSTS, host_mac, router_mac
     h = net.get(src)
     cfg = HOSTS[src]
     outs = {}
     for i, (nodename, iface) in enumerate(sniffers):
         outs[(nodename, iface)] = start_sniffer(net.get(nodename),
-                                                "%s_%d" % (src, i), iface, dst_ip)
-    time.sleep(2)                                # Scapy tarda en arrancar
+                                                "%s_%d" % (src, i), iface, dst_ip, bpf)
+    time.sleep(2)   # Scapy tarda en arrancar
     h.cmd("%s %s --send %s-eth0 %s %s %s %s %d" % (
         PY, SELF, src, host_mac(src), router_mac(cfg["router"], cfg["port"]),
         cfg["ip"], dst_ip, ttl))
@@ -148,19 +162,19 @@ def test_ttl_mac(net, rep):
 # Prueba 3: si TTL = 1 se descarta
 def test_ttl_expired(net, rep):
     from topology import HOSTS
-    print("\n== Prueba 3: Descartar TTL=1 en r1")
+    print("\n== Prueba 3: TTL=1, se reenviar solo a r1")
     res = probe(net, "h1", HOSTS["h4"]["ip"], 1,
                 [("r1", "r1-eth1"), ("h4", "h4-eth0")])
     rep.check(res[("r1", "r1-eth1")].startswith("ttl=1"),
               "el paquete TTL=1 llegó a r1 (%s)" % res[("r1", "r1-eth1")])
-    rep.check(res[("h4", "h4-eth0")] == "NONE", "no llegó a h4 (descartado)")
+    rep.check(res[("h4", "h4-eth0")] == "NONE", "no llegó a h4, no se reenvió")
 
 
 # Prueba 4: descarta paquete sin ruta (default drop)
 NO_ROUTE_IP = "10.0.9.9"  # ninguna tabla tiene ruta para 10.0.9.0/24
 
 def test_noRoute(net, rep):
-    print("\n== Prueba 4: Descartar destino (%s) sin ruta" % NO_ROUTE_IP)
+    print("\n== Prueba 4: destino sin ruta (%s) se descarta" % NO_ROUTE_IP)
     res = probe(net, "h1", NO_ROUTE_IP, 64,
                 [("r1", "r1-eth1"), ("r1", "r1-eth2")])
     rep.check(res[("r1", "r1-eth1")].startswith("ttl=64"),
@@ -170,6 +184,31 @@ def test_noRoute(net, rep):
     out = net.get("h1").cmd("ping -c 2 -W 1 %s" % NO_ROUTE_IP)
     rep.check("100% packet loss" in out, "ping a %s: 100%% de pérdida" % NO_ROUTE_IP)
 
+
+# Prueba 5: ICMP Time Exceeded
+ICMP_CASES = [(1, "10.0.1.254", 64),  # se agota en r1, el paquete no pasa por otros routers
+              (2, "10.0.12.2", 63),   # se agota en r2, el paquete pasa por r1
+              (3, "10.0.23.2", 62)]   # se agota en r3, el paquete pasa por r2 y r1
+
+
+def test_icmp(net, rep):
+    from topology import HOSTS
+    print("\n== Prueba 5: ICMP Time Exceeded ")
+    dst = HOSTS["h4"]["ip"]
+    for ttl, router_ip, reply_ttl in ICMP_CASES:
+        res = probe(net, "h1", dst, ttl, [("h1", "h1-eth0")],
+                    bpf="icmp and icmp[icmptype] == 11")
+        line = res[("h1", "h1-eth0")]
+        print("  TTL=%d: h1 recibió -> %s" % (ttl, line))
+        if line.startswith("icmp="):
+            f = dict(x.split("=") for x in line.split())
+            rep.check(f["icmp"] == "11/0", "ICMP tipo 11 código 0 (Time Exceeded)")
+            rep.check(f["from"] == router_ip, "origen del ICMP = %s (%s)" % (router_ip, f["from"]))
+            rep.check(f["orig_dst"] == dst, "cita el destino original %s" % dst)
+            rep.check(int(f["ttl"]) == reply_ttl, "TTL de la respuesta = %d (%s)" % (reply_ttl, f["ttl"]))
+            rep.check(f["chk"] == "OK" and f["ichk"] == "OK", "checksums IPv4 e ICMP válidos")
+        else:
+            rep.check(False, "h1 no recibió el ICMP Time Exceeded")
 
 def main():
     from mininet.log import setLogLevel
@@ -182,6 +221,7 @@ def main():
         test_ttl_mac(net, rep)
         test_ttl_expired(net, rep)
         test_noRoute(net, rep)
+        test_icmp(net, rep)
     finally:
         net.stop()
     print("\n== RESULTADO: %s ==" % ("TODO OK" if rep.fails == 0
