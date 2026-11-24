@@ -169,13 +169,12 @@ def print_stats(flows, protos, bytes_reg, max_len, threshold, elephants, show_al
 
 def main():
     ap = argparse.ArgumentParser(
-        description=__doc__,
+        description="Controlador de estadisticas de trafico",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     ap.add_argument("--thrift-port", type=int, default=9090)
     ap.add_argument("--interval", type=float, default=5.0, help="segundos entre lecturas (default 5)")
-    ap.add_argument("--threshold", type=int, default=1000000,
-                    help="bytes a partir de los cuales un flujo es elefante (default 1000000)")
+    ap.add_argument("--threshold", type=int, default=1000000,help="bytes a partir de los cuales un flujo es elefante (default 1000000)")
     ap.add_argument("--cli", default="simple_switch_CLI", help="binario de simple_switch_CLI")
     ap.add_argument("--all", action="store_true", help="mostrar tambien flujos sin trafico")
     ap.add_argument("--log", default="elefantes.log", help="archivo donde se registran los elefantes")
