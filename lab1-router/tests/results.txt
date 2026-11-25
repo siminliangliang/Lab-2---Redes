@@ -1,0 +1,67 @@
+
+== Prueba 1: ping entre todos los hosts
+  [PASS] h1 -> h2 (10.0.2.2)
+  [PASS] h1 -> h3 (10.0.3.3)
+  [PASS] h1 -> h4 (10.0.4.4)
+  [PASS] h2 -> h1 (10.0.1.1)
+  [PASS] h2 -> h3 (10.0.3.3)
+  [PASS] h2 -> h4 (10.0.4.4)
+  [PASS] h3 -> h1 (10.0.1.1)
+  [PASS] h3 -> h2 (10.0.2.2)
+  [PASS] h3 -> h4 (10.0.4.4)
+  [PASS] h4 -> h1 (10.0.1.1)
+  [PASS] h4 -> h2 (10.0.2.2)
+  [PASS] h4 -> h3 (10.0.3.3)
+
+== Prueba 2: decremento TTL, MAC reescrita y checksum (enviado TTL=64)
+  h1 -> h2 (2 routers): capturado en h2 -> ttl=62 smac=00:00:00:02:01:00 dmac=00:00:00:00:02:02 chk=OK
+  [PASS] TTL llegó 62, esperado 62
+  [PASS] MAC origen = router r2 (00:00:00:02:01:00)
+  [PASS] MAC destino = h2 (00:00:00:00:02:02)
+  [PASS] checksum IPv4 válido
+  h1 -> h4 (3 routers): capturado en h4 -> ttl=61 smac=00:00:00:03:02:00 dmac=00:00:00:00:04:04 chk=OK
+  [PASS] TTL llegó 61, esperado 61
+  [PASS] MAC origen = router r3 (00:00:00:03:02:00)
+  [PASS] MAC destino = h4 (00:00:00:00:04:04)
+  [PASS] checksum IPv4 válido
+  h2 -> h3 (2 routers): capturado en h3 -> ttl=62 smac=00:00:00:03:01:00 dmac=00:00:00:00:03:03 chk=OK
+  [PASS] TTL llegó 62, esperado 62
+  [PASS] MAC origen = router r3 (00:00:00:03:01:00)
+  [PASS] MAC destino = h3 (00:00:00:00:03:03)
+  [PASS] checksum IPv4 válido
+  h3 -> h4 (1 routers): capturado en h4 -> ttl=63 smac=00:00:00:03:02:00 dmac=00:00:00:00:04:04 chk=OK
+  [PASS] TTL llegó 63, esperado 63
+  [PASS] MAC origen = router r3 (00:00:00:03:02:00)
+  [PASS] MAC destino = h4 (00:00:00:00:04:04)
+  [PASS] checksum IPv4 válido
+
+== Prueba 3: TTL=1, se reenviar solo a r1
+  [PASS] el paquete TTL=1 llegó a r1 (ttl=1 smac=00:00:00:00:01:01 dmac=00:00:00:01:01:00 chk=OK)
+  [PASS] no llegó a h4, no se reenvió
+
+== Prueba 4: destino sin ruta (10.0.9.9) se descarta
+  [PASS] el paquete llegó a r1 por r1-eth1 (ttl=64 smac=00:00:00:00:01:01 dmac=00:00:00:01:01:00 chk=OK)
+  [PASS] r1 no lo reenvió por r1-eth2 (default drop)
+  [PASS] ping a 10.0.9.9: 100% de pérdida
+
+== Prueba 5: ICMP Time Exceeded 
+  TTL=1: h1 recibió -> icmp=11/0 from=10.0.1.254 orig_dst=10.0.4.4 ttl=64 chk=OK ichk=OK
+  [PASS] ICMP tipo 11 código 0 (Time Exceeded)
+  [PASS] origen del ICMP = 10.0.1.254 (10.0.1.254)
+  [PASS] cita el destino original 10.0.4.4
+  [PASS] TTL de la respuesta = 64 (64)
+  [PASS] checksums IPv4 e ICMP válidos
+  TTL=2: h1 recibió -> icmp=11/0 from=10.0.12.2 orig_dst=10.0.4.4 ttl=63 chk=OK ichk=OK
+  [PASS] ICMP tipo 11 código 0 (Time Exceeded)
+  [PASS] origen del ICMP = 10.0.12.2 (10.0.12.2)
+  [PASS] cita el destino original 10.0.4.4
+  [PASS] TTL de la respuesta = 63 (63)
+  [PASS] checksums IPv4 e ICMP válidos
+  TTL=3: h1 recibió -> icmp=11/0 from=10.0.23.2 orig_dst=10.0.4.4 ttl=62 chk=OK ichk=OK
+  [PASS] ICMP tipo 11 código 0 (Time Exceeded)
+  [PASS] origen del ICMP = 10.0.23.2 (10.0.23.2)
+  [PASS] cita el destino original 10.0.4.4
+  [PASS] TTL de la respuesta = 62 (62)
+  [PASS] checksums IPv4 e ICMP válidos
+
+== RESULTADO: TODO OK ==
