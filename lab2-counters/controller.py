@@ -123,7 +123,7 @@ def read_stats(flow_handles, thrift_port, cli_bin):
 
 
 def print_stats(flows, protos, bytes_reg, max_len, threshold, elephants, show_all, log_path):
-    print("\n=== Estadisticas %s | umbral elefante: %d bytes ===" %
+    print("\nEstadisticas %s | umbral elefante: %d bytes" %
           (time.strftime("%H:%M:%S"), threshold))
 
     print("\nPor protocolo")
